@@ -55,3 +55,5 @@ hi, i'm Sophia, but you can call me by Soph, and i go by [she/they](https://en.p
 - TealMIDIPlayer - userscript for MPP that plays MIDI files, based on Teal's MIDI player (hence the name)
 - /chat - chatting platform hosted on my site \[now defunct]
 - Project Noema - web-based, easily modifiable console environment \[need help from devs!]
+
+![](https://komarev.com/ghpvc/?username=sophb-ccjt)
