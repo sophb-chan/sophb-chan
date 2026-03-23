@@ -16,7 +16,7 @@ hi, i'm Sophia, but you can call me by Soph, and i go by [she/they](https://en.p
   - you have the right to act the same way towards me, too, it's unfair if i'm the only person that can act like that (not saying that this is a bad way to act)
 
 - i'm never afraid to disagree to unrealistic expectations from society
-- i use AI as a TOOL, like EVERYONE should, i don't use it to REPLACE me and my work (some people might mad if i don't clarify that)
+- i use AI as a TOOL, like EVERYONE should, i don't use it to REPLACE me and my work (some people might get mad if i don't clarify that)
 
 
 ## my interests
