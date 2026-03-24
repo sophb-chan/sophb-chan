@@ -5,8 +5,9 @@ hi, i'm Sophia, but you can call me by Soph, and i go by [she/they](https://en.p
 - i use regex for anything related to patterns and parsing information from text
 - sound design for my web apps
 
-
 ## a bit about me and my personality
+if you're too uncomfortable with any of these, i recommend not working with me long-term.
+
 - i tend to make a LOT of sexual innuendos and multi-layered jokes, so uh, get comfy because you're in for quite a ride, i (and some others) can tell you that
 - i have autism, ADHD, and a haystack of other issues, so patience is even more key!
   - and no, i'm not using this an excuse.
@@ -18,6 +19,11 @@ hi, i'm Sophia, but you can call me by Soph, and i go by [she/they](https://en.p
 - i'm never afraid to disagree to unrealistic expectations from society
 - i use AI as a TOOL, like EVERYONE should, i don't use it to REPLACE me and my work (some people might get mad if i don't clarify that)
 
+## what programming languages (and markup langages apparently) i know
+- JavaScript
+- HTML
+- CSS
+- A reasonable bit of Python
 
 ## my interests
 - i'm interested in:
