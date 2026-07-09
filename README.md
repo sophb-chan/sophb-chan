@@ -1,6 +1,6 @@
 hi, i'm Sophia, but you can call me by Soph, and i go by [she/they](https://en.pronouns.page/@sophb.ccjt) pronouns.
 
-**note**: i've recently started a [patreon page](https://www.patreon.com/c/sophb), and i'd really really really appreciate if you supported me!
+**note**: i've recently started a [patreon page](https://www.patreon.com/sophb), and i'd really really really appreciate if you supported me!
 
 
 ## what i do
