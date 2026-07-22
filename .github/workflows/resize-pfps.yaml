@@ -1,0 +1,179 @@
+name: Resize PFPs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pfps/**'
+  workflow_dispatch:
+
+concurrency:
+  group: resize-pfps
+  cancel-in-progress: true
+
+jobs:
+  resize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ImageMagick
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+
+      - name: Detect ImageMagick binary
+        id: im
+        run: |
+          if command -v magick &>/dev/null; then
+            echo "bin=magick" >> "$GITHUB_OUTPUT"
+          elif command -v convert &>/dev/null; then
+            echo "bin=convert" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::ImageMagick not found after install"
+            exit 1
+          fi
+
+      - name: Parse config from pfps/config.toml
+        id: config
+        run: |
+          python3 << 'EOF'
+import tomllib
+with open('pfps/config.toml', 'rb') as f:
+    cfg = tomllib.load(f)
+print(f"source_res={cfg['source_res']}")
+print(f"output_reses={' '.join(map(str, cfg['output_reses']))}")
+EOF
+
+      - name: Sync PFP resolutions
+        env:
+          IM: ${{ steps.im.outputs.bin }}
+        run: |
+          set -euo pipefail
+
+          # ── Config ────────────────────────────────────────
+          PFP_DIR="pfps"
+          SOURCE_RES=${{ steps.config.outputs.source_res }}
+          read -ra OUTPUT_RESES <<< "${{ steps.config.outputs.output_reses }}"
+          # ──────────────────────────────────────────────────
+
+          cd "$PFP_DIR"
+
+          # Detect IM command
+          IM="${{ steps.im.outputs.bin }}"
+
+          # Build the set of valid resolutions (source + outputs)
+          declare -A valid_res
+          valid_res[$SOURCE_RES]=1
+          for r in "${OUTPUT_RESES[@]}"; do
+            valid_res[$r]=1
+          done
+
+          generated=0
+          deleted=0
+
+          # Collect all source images (their base names without resolution/tp)
+          declare -A existing_sources
+
+          # ── Step 1: Generate missing variants from source-resolution images ──
+          for f in *.png; do
+            [[ -f "$f" ]] || continue
+            base="${f%.png}"
+
+            # Match: pfp_(variant_?)resolution(tp?)
+            if [[ ! "$base" =~ ^pfp_(([a-z]+)_)?([0-9]+)(tp)?$ ]]; then
+              continue
+            fi
+
+            variant="${BASH_REMATCH[2]}"
+            res="${BASH_REMATCH[3]}"
+            tp="${BASH_REMATCH[4]}"
+
+            # Record this variant's presence (without res)
+            if [[ -n "$variant" ]]; then
+              var_key="${variant%,}"
+            else
+              var_key=""
+            fi
+            existing_sources["$var_key"]=1
+
+            # Only operate from source-resolution images
+            if [[ "$res" != "$SOURCE_RES" ]]; then
+              continue
+            fi
+
+            for target_res in "${OUTPUT_RESES[@]}"; do
+              if [[ -n "$variant" ]]; then
+                target="pfp_${variant}${tp:+_}$target_res${tp:+tp}.png"
+              else
+                target="pfp_${target_res}${tp:+tp}.png"
+              fi
+
+              if [[ ! -f "$target" ]]; then
+                echo "Generating: $target (from $f)"
+                "$IM" "$f" -filter point -resize "${target_res}x${target_res}" "$target"
+                ((generated++))
+              fi
+            done
+          done
+
+          # ── Step 2: Delete PNGs whose resolution isn't valid ──
+          for f in *.png; do
+            [[ -f "$f" ]] || continue
+            base="${f%.png}"
+
+            if [[ ! "$base" =~ ^pfp_(([a-z]+)_)?([0-9]+)(tp)?$ ]]; then
+              continue
+            fi
+
+            res="${BASH_REMATCH[3]}"
+
+            if [[ -z "${valid_res[$res]:-}" ]]; then
+              echo "Deleting: $f (resolution $res not in valid list)"
+              rm "$f"
+              ((deleted++))
+            fi
+          done
+
+          # ── Step 3: Orphan cleanup — delete variants whose source is gone ──
+          for f in *.png; do
+            [[ -f "$f" ]] || continue
+            base="${f%.png}"
+
+            if [[ ! "$base" =~ ^pfp_(([a-z]+)_)?([0-9]+)(tp)?$ ]]; then
+              continue
+            fi
+
+            variant="${BASH_REMATCH[2]}"
+            tp="${BASH_REMATCH[4]}"
+
+            # Find the source image name for this variant
+            if [[ -n "$variant" ]]; then
+              source_img="pfp_${variant}${SOURCE_RES}.png"
+            else
+              source_img="pfp_${SOURCE_RES}.png"
+            fi
+
+            if [[ ! -f "$source_img" ]]; then
+              echo "Deleting: $f (orphan — source $source_img missing)"
+              rm "$f"
+              ((deleted++))
+            fi
+          done
+
+          echo ""
+          echo "::notice::Generated $generated, deleted $deleted"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pfps/
+          if git diff --cached --quiet; then
+            echo "Nothing to do — all resolutions are up to date."
+          else
+            git commit -m "chore(pfps): auto-sync resolutions"
+            git push
+          fi
