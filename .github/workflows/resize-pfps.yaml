@@ -19,12 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install ImageMagick
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y imagemagick
-
-      - name: Detect ImageMagick binary
+      - name: Detect or install ImageMagick
         id: im
         run: |
           if command -v magick &>/dev/null; then
@@ -32,24 +27,31 @@ jobs:
           elif command -v convert &>/dev/null; then
             echo "bin=convert" >> $GITHUB_OUTPUT
           else
-            echo "::error::ImageMagick not found after install"
-            exit 1
+            echo "Installing ImageMagick..."
+            sudo apt-get update
+            sudo apt-get install -y imagemagick
+            if command -v magick &>/dev/null; then
+              echo "bin=magick" >> $GITHUB_OUTPUT
+            elif command -v convert &>/dev/null; then
+              echo "bin=convert" >> $GITHUB_OUTPUT
+            else
+              echo "::error::ImageMagick not found after install"
+              exit 1
+            fi
           fi
 
-      - name: Parse config from pfps/config.toml
+      - name: Parse config from pfps/CONVERSION_MAP.toml
         id: config
         shell: python
         run: |
           import tomllib
-          with open('pfps/config.toml', 'rb') as f:
+          with open('pfps/CONVERSION_MAP.toml', 'rb') as f:
               cfg = tomllib.load(f)
           
           print(f"source_res={cfg['source_res']}")
           print(f"output_reses={' '.join(map(str, cfg['output_reses']))}")
 
       - name: Sync PFP resolutions
-        env:
-          IM: ${{ steps.im.outputs.bin }}
         run: |
           set -euo pipefail
 
@@ -57,12 +59,10 @@ jobs:
           PFP_DIR="pfps"
           SOURCE_RES=${{ steps.config.outputs.source_res }}
           read -ra OUTPUT_RESES <<< "${{ steps.config.outputs.output_reses }}"
+          IM="${{ steps.im.outputs.bin }}"
           # ──────────────────────────────────────────────────
 
           cd "$PFP_DIR"
-
-          # Detect IM command
-          IM="${{ steps.im.outputs.bin }}"
 
           # Build the set of valid resolutions (source + outputs)
           declare -A valid_res
@@ -74,15 +74,11 @@ jobs:
           generated=0
           deleted=0
 
-          # Collect all source images (their base names without resolution/tp)
-          declare -A existing_sources
-
           # ── Step 1: Generate missing variants from source-resolution images ──
           for f in *.png; do
             [[ -f "$f" ]] || continue
             base="${f%.png}"
 
-            # Match: pfp_(variant_?)resolution(tp?)
             if [[ ! "$base" =~ ^pfp_(([a-z]+)_)?([0-9]+)(tp)?$ ]]; then
               continue
             fi
@@ -91,14 +87,6 @@ jobs:
             res="${BASH_REMATCH[3]}"
             tp="${BASH_REMATCH[4]}"
 
-            # Record this variant's presence (without res)
-            if [[ -n "$variant" ]]; then
-              var_key="${variant%,}"
-            else
-              var_key=""
-            fi
-            existing_sources["$var_key"]=1
-
             # Only operate from source-resolution images
             if [[ "$res" != "$SOURCE_RES" ]]; then
               continue
@@ -106,7 +94,7 @@ jobs:
 
             for target_res in "${OUTPUT_RESES[@]}"; do
               if [[ -n "$variant" ]]; then
-                target="pfp_${variant}${tp:+_}$target_res${tp:+tp}.png"
+                target="pfp_${variant}${tp:+_}${target_res}${tp:+tp}.png"
               else
                 target="pfp_${target_res}${tp:+tp}.png"
               fi
@@ -147,9 +135,7 @@ jobs:
             fi
 
             variant="${BASH_REMATCH[2]}"
-            tp="${BASH_REMATCH[4]}"
 
-            # Find the source image name for this variant
             if [[ -n "$variant" ]]; then
               source_img="pfp_${variant}${SOURCE_RES}.png"
             else
