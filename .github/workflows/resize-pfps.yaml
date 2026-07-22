@@ -60,14 +60,23 @@ jobs:
           SOURCE_RES=${{ steps.config.outputs.source_res }}
           read -ra OUTPUT_RESES <<< "${{ steps.config.outputs.output_reses }}"
           IM="${{ steps.im.outputs.bin }}"
-          # Build valid resolutions string for grep checking
-          VALID_RES="$SOURCE_RES ${OUTPUT_RESES[*]}"
+          # Build valid resolutions array
+          VALID_RES=("$SOURCE_RES" "${OUTPUT_RESES[@]}")
           # ──────────────────────────────────────────────────
 
           cd "$PFP_DIR"
 
           generated=0
           deleted=0
+
+          # Helper function to check if resolution is valid
+          is_valid_res() {
+            local r="$1"
+            for vr in "${VALID_RES[@]}"; do
+              [[ "$r" == "$vr" ]] && return 0
+            done
+            return 1
+          }
 
           # ── Step 1: Generate missing variants from source-resolution images ──
           for f in *.png; do
@@ -81,6 +90,11 @@ jobs:
             variant="${BASH_REMATCH[2]}"
             res="${BASH_REMATCH[3]}"
             tp="${BASH_REMATCH[4]}"
+
+            # Skip if no resolution captured
+            if [[ -z "$res" ]]; then
+              continue
+            fi
 
             # Only operate from source-resolution images
             if [[ "$res" != "$SOURCE_RES" ]]; then
@@ -113,8 +127,12 @@ jobs:
 
             res="${BASH_REMATCH[3]}"
 
-            # Check if res is in VALID_RES using grep
-            if ! echo "$VALID_RES" | grep -qw "^$res$"; then
+            # Skip if no resolution captured
+            if [[ -z "$res" ]]; then
+              continue
+            fi
+
+            if ! is_valid_res "$res"; then
               echo "Deleting: $f (resolution $res not in valid list)"
               rm "$f"
               ((deleted++)) || true
@@ -131,6 +149,7 @@ jobs:
             fi
 
             variant="${BASH_REMATCH[2]}"
+            res="${BASH_REMATCH[3]}"
 
             if [[ -n "$variant" ]]; then
               source_img="pfp_${variant}${SOURCE_RES}.png"
