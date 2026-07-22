@@ -42,126 +42,132 @@ jobs:
 
       - name: Parse config from pfps/CONVERSION_MAP.toml
         id: config
-        shell: python
         run: |
+          python3 - << 'PYEOF'
+          import os
           import tomllib
+          
           with open('pfps/CONVERSION_MAP.toml', 'rb') as f:
               cfg = tomllib.load(f)
           
-          print(f"source_res={cfg['source_res']}")
-          print(f"output_reses={' '.join(map(str, cfg['output_reses']))}")
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f"source_res={cfg['source_res']}\n")
+              out.write(f"output_reses={' '.join(map(str, cfg['output_reses']))}\n")
+          PYEOF
 
       - name: Sync PFP resolutions
+        env:
+          IM: ${{ steps.im.outputs.bin }}
+          SOURCE_RES: ${{ steps.config.outputs.source_res }}
+          OUTPUT_RESES_STR: ${{ steps.config.outputs.output_reses }}
         run: |
           set -euo pipefail
 
-          # ── Config ────────────────────────────────────────
           PFP_DIR="pfps"
-          SOURCE_RES=${{ steps.config.outputs.source_res }}
-          read -ra OUTPUT_RESES <<< "${{ steps.config.outputs.output_reses }}"
-          IM="${{ steps.im.outputs.bin }}"
-          # Build valid resolutions array
-          VALID_RES=("$SOURCE_RES" "${OUTPUT_RESES[@]}")
-          # ──────────────────────────────────────────────────
+          read -ra OUTPUT_RESES <<< "$OUTPUT_RESES_STR"
+          FULL_VALID_LIST="$SOURCE_RES ${OUTPUT_RESES[*]}"
+
+          echo "=== Configuration ==="
+          echo "Source resolution: $SOURCE_RES"
+          echo "Output resolutions: ${OUTPUT_RESES[*]}"
+          echo "Valid resolutions (kept): $FULL_VALID_LIST"
+          echo "ImageMagick binary: $IM"
+          echo ""
 
           cd "$PFP_DIR"
 
           generated=0
           deleted=0
 
-          # Helper function to check if resolution is valid
-          is_valid_res() {
-            local r="$1"
-            for vr in "${VALID_RES[@]}"; do
-              [[ "$r" == "$vr" ]] && return 0
-            done
-            return 1
-          }
-
           # ── Step 1: Generate missing variants from source-resolution images ──
+          echo "=== Step 1: Generating missing variants ==="
           for f in *.png; do
-            [[ -f "$f" ]] || continue
-            base="${f%.png}"
+              [[ -f "$f" ]] || continue
+              base="${f%.png}"
 
-            if [[ ! "$base" =~ ^pfp_(([a-z]+)_)?([0-9]+)(tp)?$ ]]; then
-              continue
-            fi
-
-            variant="${BASH_REMATCH[2]}"
-            res="${BASH_REMATCH[3]}"
-            tp="${BASH_REMATCH[4]}"
-
-            # Skip if no resolution captured
-            if [[ -z "$res" ]]; then
-              continue
-            fi
-
-            # Only operate from source-resolution images
-            if [[ "$res" != "$SOURCE_RES" ]]; then
-              continue
-            fi
-
-            for target_res in "${OUTPUT_RESES[@]}"; do
-              if [[ -n "$variant" ]]; then
-                target="pfp_${variant}${tp:+_}${target_res}${tp:+tp}.png"
-              else
-                target="pfp_${target_res}${tp:+tp}.png"
+              if [[ ! "$base" =~ ^pfp_(([a-z]+)_)?([0-9]+)(tp)?$ ]]; then
+                  continue
               fi
 
-              if [[ ! -f "$target" ]]; then
-                echo "Generating: $target (from $f)"
-                "$IM" "$f" -filter point -resize "${target_res}x${target_res}" "$target"
-                ((generated++)) || true
+              variant="${BASH_REMATCH[2]}"
+              res="${BASH_REMATCH[3]}"
+              tp="${BASH_REMATCH[4]}"
+
+              [[ -z "$res" ]] && continue
+
+              if [[ "$res" != "$SOURCE_RES" ]]; then
+                  continue
               fi
-            done
+
+              for target_res in "${OUTPUT_RESES[@]}"; do
+                  if [[ -n "$variant" ]]; then
+                      target="pfp_${variant}_${target_res}${tp:+tp}.png"
+                  else
+                      target="pfp_${target_res}${tp:+tp}.png"
+                  fi
+
+                  if [[ ! -f "$target" ]]; then
+                      echo "  Generating: $target (from $f)"
+                      "$IM" "$f" -filter point -resize "${target_res}x${target_res}" "$target"
+                      ((generated++)) || true
+                  fi
+              done
           done
 
           # ── Step 2: Delete PNGs whose resolution isn't valid ──
+          echo ""
+          echo "=== Step 2: Deleting invalid-resolution PNGs ==="
           for f in *.png; do
-            [[ -f "$f" ]] || continue
-            base="${f%.png}"
+              [[ -f "$f" ]] || continue
+              base="${f%.png}"
 
-            if [[ ! "$base" =~ ^pfp_(([a-z]+)_)?([0-9]+)(tp)?$ ]]; then
-              continue
-            fi
+              if [[ ! "$base" =~ ^pfp_(([a-z]+)_)?([0-9]+)(tp)?$ ]]; then
+                  continue
+              fi
 
-            res="${BASH_REMATCH[3]}"
+              res="${BASH_REMATCH[3]}"
+              [[ -z "$res" ]] && continue
 
-            # Skip if no resolution captured
-            if [[ -z "$res" ]]; then
-              continue
-            fi
+              found=false
+              for vr in $FULL_VALID_LIST; do
+                  if [[ "$res" == "$vr" ]]; then
+                      found=true
+                      break
+                  fi
+              done
 
-            if ! is_valid_res "$res"; then
-              echo "Deleting: $f (resolution $res not in valid list)"
-              rm "$f"
-              ((deleted++)) || true
-            fi
+              if [[ "$found" == "false" ]]; then
+                  echo "  Deleting: $f (resolution $res not in valid list)"
+                  rm "$f"
+                  ((deleted++)) || true
+              fi
           done
 
           # ── Step 3: Orphan cleanup — delete variants whose source is gone ──
+          echo ""
+          echo "=== Step 3: Cleaning up orphans ==="
           for f in *.png; do
-            [[ -f "$f" ]] || continue
-            base="${f%.png}"
+              [[ -f "$f" ]] || continue
+              base="${f%.png}"
 
-            if [[ ! "$base" =~ ^pfp_(([a-z]+)_)?([0-9]+)(tp)?$ ]]; then
-              continue
-            fi
+              if [[ ! "$base" =~ ^pfp_(([a-z]+)_)?([0-9]+)(tp)?$ ]]; then
+                  continue
+              fi
 
-            variant="${BASH_REMATCH[2]}"
-            res="${BASH_REMATCH[3]}"
+              variant="${BASH_REMATCH[2]}"
+              tp="${BASH_REMATCH[4]}"
 
-            if [[ -n "$variant" ]]; then
-              source_img="pfp_${variant}${SOURCE_RES}.png"
-            else
-              source_img="pfp_${SOURCE_RES}.png"
-            fi
+              if [[ -n "$variant" ]]; then
+                  source_img="pfp_${variant}_${SOURCE_RES}${tp:+tp}.png"
+              else
+                  source_img="pfp_${SOURCE_RES}${tp:+tp}.png"
+              fi
 
-            if [[ ! -f "$source_img" ]]; then
-              echo "Deleting: $f (orphan — source $source_img missing)"
-              rm "$f"
-              ((deleted++)) || true
-            fi
+              if [[ ! -f "$source_img" ]]; then
+                  echo "  Deleting: $f (orphan — source $source_img missing)"
+                  rm "$f"
+                  ((deleted++)) || true
+              fi
           done
 
           echo ""
@@ -173,8 +179,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add pfps/
           if git diff --cached --quiet; then
-            echo "Nothing to do — all resolutions are up to date."
+              echo "Nothing to do — all resolutions are up to date."
           else
-            git commit -m "chore(pfps): auto-sync resolutions"
-            git push
+              git commit -m "chore(pfps): auto-sync resolutions"
+              git push
           fi
