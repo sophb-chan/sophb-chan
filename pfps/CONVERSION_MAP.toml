@@ -1,2 +1,2 @@
 source_res = 16
-output_reses = [64, 256, 512, 2048]
+output_reses = [64, 128, 256, 512, 1024, 2048]
