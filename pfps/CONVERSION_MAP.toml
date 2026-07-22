@@ -1,0 +1,2 @@
+source_res = 16
+output_reses = [64, 256, 512, 2048]
