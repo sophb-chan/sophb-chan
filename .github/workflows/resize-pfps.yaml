@@ -60,16 +60,11 @@ jobs:
           SOURCE_RES=${{ steps.config.outputs.source_res }}
           read -ra OUTPUT_RESES <<< "${{ steps.config.outputs.output_reses }}"
           IM="${{ steps.im.outputs.bin }}"
+          # Build valid resolutions string for grep checking
+          VALID_RES="$SOURCE_RES ${OUTPUT_RESES[*]}"
           # ──────────────────────────────────────────────────
 
           cd "$PFP_DIR"
-
-          # Build the set of valid resolutions (source + outputs)
-          declare -A valid_res
-          valid_res[$SOURCE_RES]=1
-          for r in "${OUTPUT_RESES[@]}"; do
-            valid_res[$r]=1
-          done
 
           generated=0
           deleted=0
@@ -102,7 +97,7 @@ jobs:
               if [[ ! -f "$target" ]]; then
                 echo "Generating: $target (from $f)"
                 "$IM" "$f" -filter point -resize "${target_res}x${target_res}" "$target"
-                ((generated++))
+                ((generated++)) || true
               fi
             done
           done
@@ -118,10 +113,11 @@ jobs:
 
             res="${BASH_REMATCH[3]}"
 
-            if [[ -z "${valid_res[$res]:-}" ]]; then
+            # Check if res is in VALID_RES using grep
+            if ! echo "$VALID_RES" | grep -qw "^$res$"; then
               echo "Deleting: $f (resolution $res not in valid list)"
               rm "$f"
-              ((deleted++))
+              ((deleted++)) || true
             fi
           done
 
@@ -145,7 +141,7 @@ jobs:
             if [[ ! -f "$source_img" ]]; then
               echo "Deleting: $f (orphan — source $source_img missing)"
               rm "$f"
-              ((deleted++))
+              ((deleted++)) || true
             fi
           done
 
