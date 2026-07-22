@@ -28,9 +28,9 @@ jobs:
         id: im
         run: |
           if command -v magick &>/dev/null; then
-            echo "bin=magick" >> "$GITHUB_OUTPUT"
+            echo "bin=magick" >> $GITHUB_OUTPUT
           elif command -v convert &>/dev/null; then
-            echo "bin=convert" >> "$GITHUB_OUTPUT"
+            echo "bin=convert" >> $GITHUB_OUTPUT
           else
             echo "::error::ImageMagick not found after install"
             exit 1
@@ -38,14 +38,14 @@ jobs:
 
       - name: Parse config from pfps/config.toml
         id: config
+        shell: python
         run: |
-          python3 << 'EOF'
-import tomllib
-with open('pfps/config.toml', 'rb') as f:
-    cfg = tomllib.load(f)
-print(f"source_res={cfg['source_res']}")
-print(f"output_reses={' '.join(map(str, cfg['output_reses']))}")
-EOF
+          import tomllib
+          with open('pfps/config.toml', 'rb') as f:
+              cfg = tomllib.load(f)
+          
+          print(f"source_res={cfg['source_res']}")
+          print(f"output_reses={' '.join(map(str, cfg['output_reses']))}")
 
       - name: Sync PFP resolutions
         env:
