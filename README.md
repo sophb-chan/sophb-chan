@@ -26,9 +26,10 @@ if you're too uncomfortable with any of these, i recommend not working with me l
 - JavaScript
 - HTML
 - CSS
+- Bash (Learning still)
 - A reasonable bit of Python
 
-as a side-note: i'm looking forward to learning C#, then C, and then Assembly Language. lower-level JS just really doesn't scratch my itch, y'know?
+**as a side-note**: i'm planning on learning C#, then C, and then Assembly Language. lower-level JS just really doesn't scratch my itch, y'know?
 
 ## my interests
 - i'm interested in:
@@ -68,4 +69,4 @@ as a side-note: i'm looking forward to learning C#, then C, and then Assembly La
 - /chat - chatting platform hosted on my site \[now defunct, could come back any time soon tho]
 - Project Noema - web-based, easily modifiable console environment
 
-![](https://komarev.com/ghpvc/?username=sophb-chan)
+![Profile View Counter](https://komarev.com/ghpvc/?username=sophb-chan)
