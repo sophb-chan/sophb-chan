@@ -85,13 +85,14 @@ jobs:
               [[ -f "$f" ]] || continue
               base="${f%.png}"
 
-              if [[ ! "$base" =~ ^pfp_(([a-z]+)_)?([0-9]+)(tp)?$ ]]; then
+              if [[ ! "$base" =~ ^pfp_(([a-z]+)_)?([0-9]+)(tp)?(us)?$ ]]; then
                   continue
               fi
 
               variant="${BASH_REMATCH[2]}"
               res="${BASH_REMATCH[3]}"
               tp="${BASH_REMATCH[4]}"
+              us="${BASH_REMATCH[5]}"
 
               [[ -z "$res" ]] && continue
 
@@ -101,9 +102,9 @@ jobs:
 
               for target_res in "${OUTPUT_RESES[@]}"; do
                   if [[ -n "$variant" ]]; then
-                      target="pfp_${variant}_${target_res}${tp:+tp}.png"
+                      target="pfp_${variant}_${target_res}${tp:+tp}${us:+us}.png"
                   else
-                      target="pfp_${target_res}${tp:+tp}.png"
+                      target="pfp_${target_res}${tp:+tp}${us:+us}.png"
                   fi
 
                   if [[ ! -f "$target" ]]; then
@@ -121,7 +122,7 @@ jobs:
               [[ -f "$f" ]] || continue
               base="${f%.png}"
 
-              if [[ ! "$base" =~ ^pfp_(([a-z]+)_)?([0-9]+)(tp)?$ ]]; then
+              if [[ ! "$base" =~ ^pfp_(([a-z]+)_)?([0-9]+)(tp)?(us)?$ ]]; then
                   continue
               fi
 
